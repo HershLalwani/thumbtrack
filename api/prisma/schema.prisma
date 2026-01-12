@@ -1,0 +1,131 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../node_modules/.prisma/client"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id           String        @id @default(cuid())
+  email        String        @unique
+  username     String        @unique
+  password     String
+  avatarUrl    String?
+  bio          String?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  pins         Pin[]
+  boards       Board[]
+  comments     Comment[]
+  boardMembers BoardMember[]
+  // Follow relationships
+  followers    Follow[]      @relation("Following")
+  following    Follow[]      @relation("Followers")
+}
+
+model Follow {
+  id          String   @id @default(cuid())
+  followerId  String
+  followingId String
+  follower    User     @relation("Followers", fields: [followerId], references: [id], onDelete: Cascade)
+  following   User     @relation("Following", fields: [followingId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+
+  @@unique([followerId, followingId])
+  @@index([followerId])
+  @@index([followingId])
+}
+
+model Pin {
+  id          String     @id @default(cuid())
+  title       String
+  description String?
+  imageUrl    String
+  link        String?
+  tags        String[]   @default([])
+  userId      String
+  user        User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  savedPins   SavedPin[]
+  comments    Comment[]
+  views       PinView[]
+
+  @@index([userId])
+  @@index([tags])
+}
+
+model PinView {
+  id        String   @id @default(cuid())
+  pinId     String
+  userId    String?
+  pin       Pin      @relation(fields: [pinId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@index([pinId])
+  @@index([userId])
+}
+
+model Comment {
+  id        String   @id @default(cuid())
+  content   String
+  pinId     String
+  userId    String
+  pin       Pin      @relation(fields: [pinId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([pinId])
+  @@index([userId])
+}
+
+model Board {
+  id          String        @id @default(cuid())
+  name        String
+  description String?
+  isPrivate   Boolean       @default(false)
+  userId      String
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  savedPins   SavedPin[]
+  members     BoardMember[]
+
+  @@index([userId])
+}
+
+model BoardMember {
+  id        String          @id @default(cuid())
+  boardId   String
+  userId    String
+  role      BoardMemberRole @default(CONTRIBUTOR)
+  board     Board           @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  user      User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime        @default(now())
+
+  @@unique([boardId, userId])
+  @@index([boardId])
+  @@index([userId])
+}
+
+enum BoardMemberRole {
+  ADMIN
+  CONTRIBUTOR
+}
+
+model SavedPin {
+  id        String   @id @default(cuid())
+  pinId     String
+  boardId   String
+  userId    String?  // Track who saved the pin (for group boards)
+  pin       Pin      @relation(fields: [pinId], references: [id], onDelete: Cascade)
+  board     Board    @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([pinId, boardId])
+  @@index([boardId])
+  @@index([pinId])
+}
