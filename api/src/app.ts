@@ -12,7 +12,6 @@ import { recommendationRoutes } from './routes/recommendations.js';
 import { uploadRoutes } from './routes/uploads.js';
 import { authPlugin } from './plugins/auth.js';
 import { initializeElasticsearch } from './lib/elasticsearch.js';
-import { configureBucketCors } from './lib/r2.js';
 
 export async function buildApp() {
   const fastify = Fastify({
@@ -21,9 +20,6 @@ export async function buildApp() {
 
   // Initialize Elasticsearch
   await initializeElasticsearch();
-
-  // Configure R2 bucket CORS for direct uploads
-  await configureBucketCors();
 
   // Register CORS
   await fastify.register(cors, {

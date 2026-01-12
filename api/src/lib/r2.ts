@@ -1,10 +1,4 @@
-import { 
-  S3Client, 
-  PutObjectCommand, 
-  DeleteObjectCommand,
-  PutBucketCorsCommand,
-  GetBucketCorsCommand
-} from '@aws-sdk/client-s3';
+import { S3Client, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { randomUUID } from 'crypto';
 
@@ -16,9 +10,6 @@ const r2Client = new S3Client({
     accessKeyId: process.env.R2_ACCESS_KEY_ID!,
     secretAccessKey: process.env.R2_SECRET_ACCESS_KEY!,
   },
-  // Disable checksum validation for R2 compatibility
-  requestChecksumCalculation: 'WHEN_REQUIRED',
-  responseChecksumValidation: 'WHEN_REQUIRED',
 });
 
 const BUCKET_NAME = process.env.R2_BUCKET_NAME!;
@@ -27,52 +18,6 @@ const PUBLIC_URL = process.env.R2_PUBLIC_URL!; // Your R2 public URL or custom d
 // Allowed image types
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
-
-/**
- * Configure CORS on the R2 bucket to allow browser uploads
- */
-export async function configureBucketCors(): Promise<void> {
-  if (!isR2Configured()) {
-    console.log('R2 not configured, skipping CORS setup');
-    return;
-  }
-
-  try {
-    // Check if CORS is already configured
-    try {
-      await r2Client.send(new GetBucketCorsCommand({ Bucket: BUCKET_NAME }));
-      console.log('R2 bucket CORS already configured');
-      return;
-    } catch (error: any) {
-      // NoSuchCORSConfiguration means we need to set it up
-      if (error.name !== 'NoSuchCORSConfiguration') {
-        throw error;
-      }
-    }
-
-    // Set up CORS rules
-    const corsCommand = new PutBucketCorsCommand({
-      Bucket: BUCKET_NAME,
-      CORSConfiguration: {
-        CORSRules: [
-          {
-            AllowedHeaders: ['*'],
-            AllowedMethods: ['GET', 'PUT', 'POST', 'DELETE', 'HEAD'],
-            AllowedOrigins: ['*'], // In production, restrict to your domain
-            ExposeHeaders: ['ETag', 'Content-Length', 'Content-Type'],
-            MaxAgeSeconds: 3600,
-          },
-        ],
-      },
-    });
-
-    await r2Client.send(corsCommand);
-    console.log('R2 bucket CORS configured successfully');
-  } catch (error) {
-    console.error('Failed to configure R2 bucket CORS:', error);
-    // Don't throw - the app can still work, just uploads might fail
-  }
-}
 
 interface UploadUrlResult {
   uploadUrl: string;
@@ -95,21 +40,14 @@ export async function generateUploadUrl(
   const ext = contentType.split('/')[1];
   const key = `pins/${userId}/${randomUUID()}.${ext}`;
 
-  // Don't include ContentType in the command - let the browser set it
-  // This avoids signature mismatch issues with R2
   const command = new PutObjectCommand({
     Bucket: BUCKET_NAME,
     Key: key,
-    // Explicitly disable checksums for browser uploads
-    ChecksumAlgorithm: undefined,
+    ContentType: contentType,
   });
 
   // URL expires in 10 minutes
-  // signableHeaders: only sign the host header to avoid CORS issues
-  const uploadUrl = await getSignedUrl(r2Client, command, { 
-    expiresIn: 600,
-    signableHeaders: new Set(['host']),
-  });
+  const uploadUrl = await getSignedUrl(r2Client, command, { expiresIn: 600 });
 
   return {
     uploadUrl,

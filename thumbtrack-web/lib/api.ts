@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { AuthResponse, Pin, PinsResponse, User, ApiError, Board, BoardsResponse, BoardSummary, Comment, CommentsResponse, UsersResponse, BoardMember, TagCount } from '@/types';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
@@ -323,17 +322,16 @@ class ApiClient {
     const { uploadUrl, publicUrl } = await this.getPresignedUploadUrl(file.type);
     
     // Upload directly to R2
-    // Don't set Content-Type header - let browser handle it to avoid CORS issues
     const uploadResponse = await fetch(uploadUrl, {
       method: 'PUT',
       body: file,
-      mode: 'cors',
+      headers: {
+        'Content-Type': file.type,
+      },
     });
 
     if (!uploadResponse.ok) {
-      const errorText = await uploadResponse.text().catch(() => 'Unknown error');
-      console.error('R2 upload failed:', uploadResponse.status, errorText);
-      throw new Error(`Failed to upload image: ${uploadResponse.status}`);
+      throw new Error('Failed to upload image');
     }
 
     return publicUrl;
