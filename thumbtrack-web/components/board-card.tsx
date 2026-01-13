@@ -1,14 +1,15 @@
 'use client';
 
 import Link from 'next/link';
-import { Board } from '@/types';
+import { Board, BoardSummary } from '@/types';
 
 interface BoardCardProps {
-  board: Board;
+  board: Board | BoardSummary;
 }
 
 export function BoardCard({ board }: BoardCardProps) {
-  const coverImages = board.coverImages || [];
+  // coverImages only exists on Board, not BoardSummary
+  const coverImages = 'coverImages' in board ? board.coverImages || [] : [];
 
   return (
     <Link href={`/board/${board.id}`} className="group block">

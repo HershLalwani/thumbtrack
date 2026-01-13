@@ -5,6 +5,8 @@ export interface User {
   avatarUrl: string | null;
   bio?: string | null;
   createdAt: string;
+  followers?: number;
+  following?: number;
   _count?: {
     pins: number;
     boards: number;

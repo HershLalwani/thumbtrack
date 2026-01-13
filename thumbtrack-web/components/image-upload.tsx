@@ -8,6 +8,14 @@ interface ImageUploadProps {
   currentUrl?: string;
 }
 
+interface UploadStats {
+  originalSize: number;
+  convertedSize: number;
+  compressionRatio: string;
+  width: number;
+  height: number;
+}
+
 export function ImageUpload({ onImageUrl, currentUrl }: ImageUploadProps) {
   const [mode, setMode] = useState<'upload' | 'url'>('upload');
   const [isUploading, setIsUploading] = useState(false);
@@ -17,7 +25,14 @@ export function ImageUpload({ onImageUrl, currentUrl }: ImageUploadProps) {
   const [previewUrl, setPreviewUrl] = useState(currentUrl || '');
   const [isR2Available, setIsR2Available] = useState<boolean | null>(null);
   const [dragActive, setDragActive] = useState(false);
+  const [uploadStats, setUploadStats] = useState<UploadStats | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const formatFileSize = (bytes: number): string => {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  };
 
   useEffect(() => {
     // Check if R2 uploads are available
@@ -46,6 +61,7 @@ export function ImageUpload({ onImageUrl, currentUrl }: ImageUploadProps) {
     }
 
     setError('');
+    setUploadStats(null);
     setIsUploading(true);
     setUploadProgress(0);
 
@@ -54,19 +70,29 @@ export function ImageUpload({ onImageUrl, currentUrl }: ImageUploadProps) {
       const localPreview = URL.createObjectURL(file);
       setPreviewUrl(localPreview);
 
-      // Simulate progress (actual upload doesn't give progress events with fetch)
+      // Simulate progress during upload + conversion
       const progressInterval = setInterval(() => {
-        setUploadProgress((prev) => Math.min(prev + 10, 90));
-      }, 100);
+        setUploadProgress((prev) => Math.min(prev + 5, 90));
+      }, 150);
 
-      const publicUrl = await api.uploadImageToR2(file);
+      // Upload and convert to WebP on server
+      const result = await api.uploadImageToR2(file);
       
       clearInterval(progressInterval);
       setUploadProgress(100);
       
-      // Update to the actual URL
-      setPreviewUrl(publicUrl);
-      onImageUrl(publicUrl);
+      // Update to the actual URL (now WebP)
+      setPreviewUrl(result.publicUrl);
+      onImageUrl(result.publicUrl);
+      
+      // Store stats for display
+      setUploadStats({
+        originalSize: result.originalSize,
+        convertedSize: result.convertedSize,
+        compressionRatio: result.compressionRatio,
+        width: result.width,
+        height: result.height,
+      });
       
       // Clean up local preview
       URL.revokeObjectURL(localPreview);
@@ -214,6 +240,9 @@ export function ImageUpload({ onImageUrl, currentUrl }: ImageUploadProps) {
               <p className="text-gray-500 dark:text-gray-400 text-sm">
                 PNG, JPG, GIF, WEBP up to 10MB
               </p>
+              <p className="text-green-600 dark:text-green-400 text-xs mt-2">
+                ✨ Auto-converted to WebP for faster loading
+              </p>
             </>
           )}
         </div>
@@ -251,29 +280,62 @@ export function ImageUpload({ onImageUrl, currentUrl }: ImageUploadProps) {
 
       {/* Preview */}
       {previewUrl && (
-        <div className="relative">
-          <img
-            src={previewUrl}
-            alt="Preview"
-            className="w-full rounded-xl object-cover max-h-96"
-            onError={() => {
-              setError('Failed to load image');
-              setPreviewUrl('');
-            }}
-          />
-          <button
-            type="button"
-            onClick={() => {
-              setPreviewUrl('');
-              setUrlInput('');
-              onImageUrl('');
-            }}
-            className="absolute top-2 right-2 p-2 bg-black/50 hover:bg-black/70 rounded-full text-white transition-colors"
-          >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
+        <div className="space-y-3">
+          <div className="relative">
+            <img
+              src={previewUrl}
+              alt="Preview"
+              className="w-full rounded-xl object-cover max-h-96"
+              onError={() => {
+                setError('Failed to load image');
+                setPreviewUrl('');
+              }}
+            />
+            <button
+              type="button"
+              onClick={() => {
+                setPreviewUrl('');
+                setUrlInput('');
+                setUploadStats(null);
+                onImageUrl('');
+              }}
+              className="absolute top-2 right-2 p-2 bg-black/50 hover:bg-black/70 rounded-full text-white transition-colors"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+
+          {/* Conversion Stats */}
+          {uploadStats && (
+            <div className="bg-green-50 dark:bg-green-900/20 rounded-lg p-3 text-sm">
+              <div className="flex items-center gap-2 text-green-700 dark:text-green-300 font-medium mb-2">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+                Converted to WebP
+              </div>
+              <div className="grid grid-cols-2 gap-2 text-xs text-green-600 dark:text-green-400">
+                <div>
+                  <span className="text-gray-500 dark:text-gray-400">Original:</span>{' '}
+                  {formatFileSize(uploadStats.originalSize)}
+                </div>
+                <div>
+                  <span className="text-gray-500 dark:text-gray-400">WebP:</span>{' '}
+                  {formatFileSize(uploadStats.convertedSize)}
+                </div>
+                <div>
+                  <span className="text-gray-500 dark:text-gray-400">Saved:</span>{' '}
+                  <span className="font-medium">{uploadStats.compressionRatio}</span>
+                </div>
+                <div>
+                  <span className="text-gray-500 dark:text-gray-400">Size:</span>{' '}
+                  {uploadStats.width}×{uploadStats.height}
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>

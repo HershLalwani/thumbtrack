@@ -317,24 +317,37 @@ class ApiClient {
     });
   }
 
-  async uploadImageToR2(file: File): Promise<string> {
-    // Get presigned URL
-    const { uploadUrl, publicUrl } = await this.getPresignedUploadUrl(file.type);
-    
-    // Upload directly to R2
-    const uploadResponse = await fetch(uploadUrl, {
-      method: 'PUT',
-      body: file,
+  /**
+   * Upload image to R2 with automatic WebP conversion
+   * @param file - The image file to upload
+   * @returns Object with publicUrl and conversion stats
+   */
+  async uploadImageToR2(file: File): Promise<{
+    publicUrl: string;
+    width: number;
+    height: number;
+    originalSize: number;
+    convertedSize: number;
+    compressionRatio: string;
+  }> {
+    const token = this.getToken();
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const response = await fetch(`${API_URL}/uploads/image`, {
+      method: 'POST',
       headers: {
-        'Content-Type': file.type,
+        ...(token && { Authorization: `Bearer ${token}` }),
       },
+      body: formData,
     });
 
-    if (!uploadResponse.ok) {
-      throw new Error('Failed to upload image');
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to upload image');
     }
 
-    return publicUrl;
+    return response.json();
   }
 }
 

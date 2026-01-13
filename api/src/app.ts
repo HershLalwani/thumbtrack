@@ -1,6 +1,7 @@
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import jwt from '@fastify/jwt';
+import multipart from '@fastify/multipart';
 import { authRoutes } from './routes/auth.js';
 import { pinRoutes } from './routes/pins.js';
 import { userRoutes } from './routes/users.js';
@@ -30,6 +31,13 @@ export async function buildApp() {
   // Register JWT
   await fastify.register(jwt, {
     secret: process.env.JWT_SECRET || 'fallback-secret-change-me',
+  });
+
+  // Register multipart for file uploads
+  await fastify.register(multipart, {
+    limits: {
+      fileSize: 10 * 1024 * 1024, // 10MB max
+    },
   });
 
   // Register auth plugin (adds authenticate decorator)

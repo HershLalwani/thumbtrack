@@ -8,6 +8,7 @@ import { useAuth } from '@/lib/auth-context';
 export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [rememberMe, setRememberMe] = useState(true);
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const { login } = useAuth();
@@ -19,7 +20,7 @@ export default function LoginPage() {
     setIsLoading(true);
 
     try {
-      await login(email, password);
+      await login(email, password, rememberMe);
       router.push('/');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to login');
@@ -75,6 +76,19 @@ export default function LoginPage() {
                 placeholder="Enter your password"
                 required
               />
+            </div>
+
+            <div className="flex items-center">
+              <input
+                type="checkbox"
+                id="rememberMe"
+                checked={rememberMe}
+                onChange={(e) => setRememberMe(e.target.checked)}
+                className="w-4 h-4 text-red-500 bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-700 rounded focus:ring-red-500 focus:ring-2"
+              />
+              <label htmlFor="rememberMe" className="ml-2 text-sm text-gray-600 dark:text-gray-400">
+                Keep me logged in for 7 days
+              </label>
             </div>
 
             <button
